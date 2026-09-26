@@ -1,0 +1,15 @@
+{
+  "name": "recordroom",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based program data processing and summary reports",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "express": "5.2.1"
+  }
+}

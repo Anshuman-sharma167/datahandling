@@ -1,0 +1,7 @@
+{
+  "framework": "express",
+  "buildCommand": "node scripts/prepare-public.js",
+  "functions": {
+    "server.js": { "maxDuration": 60 }
+  }
+}

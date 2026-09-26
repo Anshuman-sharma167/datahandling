@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recordroom | Program data report</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+  <script src="data-engine.js"></script>
+  <style>
+    :root { --accent: #2E6F6E; --amber: #C9A227; --line: #dcded8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #FAFAF7; color: #1B2430; font: 1rem/1.6 system-ui, sans-serif; }
+    main { max-width: 1160px; margin: 36px auto; padding: 0 24px; }
+    h1, h2, h3 { line-height: 1.3; }
+    h1 { font-size: 1.75rem; margin: 0 0 8px; }
+    h2 { font-size: 1.5rem; margin: 0 0 24px; }
+    h3 { font-size: 1.125rem; margin: 0 0 12px; }
+    .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 0; padding: 0; margin: 32px 0; list-style: none; color: #535d65; border-bottom:1px solid var(--line); }
+    .steps li { padding:16px 20px; }
+    .steps [aria-current="step"] { color: var(--accent); border-bottom:3px solid var(--accent); margin-bottom:-1px; font-weight: 700; }
+    .panel, .card { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 24px 0; }
+    .card { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; }
+    input { max-width: 100%; font: inherit; }
+    input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #858d8d; border-radius: 2px; background: #fff; color: inherit; }
+    button { padding: 10px 18px; background: var(--accent); color: #fff; border: 1px solid var(--accent); border-radius: 2px; font: inherit; font-weight:600; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    button.secondary { background: transparent; color: var(--accent); }
+    button:hover:not(:disabled) { filter: brightness(.92); }
+    button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+    .badge { display: block; font-size: 1rem; padding: 8px 12px; border-left: 3px solid; margin: 8px 0; }
+    .green { border-color: var(--accent); color: #1B2430; background: #edf3ef; }
+    .yellow, .red { border-color: var(--amber); color: #1B2430; background: #f6f0df; }
+    .value { font-size: 32px; font-weight: 700; margin: 12px 0; }
+    .muted { color: #535d65; }
+    .decisions { padding-left: 22px; }
+    .decisions li { margin: 8px 0; }
+    details { margin-top: 16px; }
+    summary { cursor: pointer; }
+    .table-wrap { overflow-x: auto; margin-top: 12px; }
+    table { border-collapse: collapse; width: 100%; text-align: left; font-size: .85rem; }
+    caption { text-align: left; padding: 12px 10px; font-weight: 600; }
+    th, td { border-bottom: 1px solid #ddd; padding: 10px; white-space: nowrap; }
+    .chat-controls { display: flex; gap: 12px; align-items: end; }
+    .chat-controls .question { flex: 1; }
+    .answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:24px; background:transparent; border-bottom:1px solid var(--line); padding:18px max(24px,calc((100vw - 1112px)/2)); font-weight:700; }
+    .brand { display:flex; gap:12px; align-items:center; font-size:1.125rem; }
+    .brand-mark { display:grid; place-items:center; width:34px; height:34px; background:var(--accent); color:white; font-size:1rem; font-weight:700; }
+    .topbar .workspace-label { font-size:.85rem; color:#535d65; font-weight:400; }
+    .intro { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr); gap:64px; align-items:center; padding:16px 0 8px; }
+    .intro h1 { max-width:620px; }
+    .intro-copy { max-width:620px; margin:16px 0 0; }
+    .product-facts { padding:0; margin:0; list-style:none; font-size:.85rem; color:#535d65; }
+    .product-facts li { padding:10px 0; border-bottom:1px solid var(--line); }
+    .product-facts strong { color:#1B2430; font-weight:600; }
+    .section-description { max-width:760px; margin:-12px 0 24px; color:#535d65; }
+    .upload-zone label { font-size:1.125rem; }
+    input[type="file"] { display:block; width:100%; padding:14px 0; color:#535d65; }
+    input[type="file"]::file-selector-button { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:2px; font:inherit; font-weight:600; padding:10px 18px; margin-right:16px; cursor:pointer; }
+    input[type="file"]::file-selector-button:hover { background:#edf3ef; }
+    .site-footer { display:flex; justify-content:space-between; gap:24px; margin-top:40px; padding-top:20px; color:#535d65; border-top:1px solid var(--line); font-size:.85rem; }
+    .eyebrow { color:var(--accent); font-size:.85rem; font-weight:600; margin-bottom:12px; }
+    .upload-zone { padding:24px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:24px 0; }
+    .toolbar input,.toolbar select { padding:10px; font:inherit; border:1px solid #858d8d; border-radius:2px; background:#fff; color:inherit; } .toolbar input { flex:1; min-width:180px; }
+    .toolbar label { margin:0; }
+    .audit-entry { border:0; border-top:1px solid var(--line); padding:16px 12px; margin:0; }
+    .audit-entry.merge, .audit-entry.duplicate, .audit-entry.outlier, .audit-entry.skipped { border-left:3px solid var(--amber); }
+    .audit-entry summary { font-weight:600; } .audit-entry .muted { font-size:.85rem; }
+    .decisions { padding:0; } .decisions code { white-space:pre-wrap; overflow-wrap:anywhere; }
+    .metric-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; align-items:start; }
+    .metric-grid .card { position:relative; min-width:0; margin:0; padding:24px 20px; border-left:4px solid transparent; border-top:1px solid var(--line); }
+    .metric-grid .card:has(details[open]) { border-left-color:var(--accent); background:#edf3ef; }
+    .metric-grid .card:has(summary:focus-visible) { outline:3px solid var(--accent); outline-offset:4px; }
+    .metric-grid .card:has(details[open]) .value { color:var(--accent); }
+    .metric-grid summary { color:var(--accent); font-weight:600; list-style:none; padding:10px 0; }
+    .metric-grid summary::-webkit-details-marker { display:none; }
+    .metric-grid details:not([open]) > summary::after { content:""; position:absolute; inset:0; cursor:pointer; }
+    .metric-grid .table-wrap { border-left:4px solid var(--accent); background:#FAFAF7; max-height:420px; overflow:auto; }
+    .metric-grid caption { color:var(--accent); border-bottom:1px solid var(--accent); }
+    .metric-grid td:nth-child(1), .metric-grid td:nth-child(3) { white-space:nowrap; }
+    .value { font-size:3rem; line-height:1.15; font-weight:700; margin:16px 0; font-variant-numeric:tabular-nums; }
+    th { background:#edf0eb; } td { white-space:normal; }
+    .notice { padding:12px 16px; background:transparent; border-left:2px solid var(--line); font-size:.85rem; margin:18px 0; }
+    .section-head { display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:20px; }
+    #file-list, #report-date, #audit-count, #summary-status, #pdf-status { font-size:.85rem; color:#535d65; }
+    #file-list, .answer, td { overflow-wrap:anywhere; }
+    #report-findings { padding:24px 0; margin:24px 0; }
+    #report-audit { padding:24px 0; border-bottom:1px solid var(--line); }
+    #report-audit > summary { font-weight:600; }
+    a { color:var(--accent); }
+    @media(max-width:800px) { .intro { grid-template-columns:1fr; gap:24px; } .product-facts { display:none; } }
+    @media(max-width:640px) { .metric-grid { grid-template-columns:1fr; } .steps li { padding:12px 8px; font-size:.85rem; } .topbar .workspace-label { display:none; } .section-head { flex-wrap:wrap; } .site-footer { flex-direction:column; gap:8px; } }
+    @media print { body { background:#fff; } main { margin:0; max-width:none; } .topbar,.steps,#upload-step,#review-step,#chat-panel,.actions,#print-report { display:none!important; } #report-step { display:block!important; } .panel,.card { break-inside:avoid; box-shadow:none; } .metric-grid { display:block; } .metric-grid details { display:none; } #report-audit details { display:block; } #report-audit summary { display:block; } #report-audit details > * { display:block; } h2,h3 { break-after:avoid; } @page { margin:18mm; size:A4; } }
+    [hidden] { display: none !important; }
+    @media (max-width: 560px) { main { margin-top: 24px; padding: 0 16px; } .panel { padding:24px 0; } .metric-grid .card { padding:20px 16px; } .chat-controls { align-items: stretch; flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark" aria-hidden="true">R</span>Recordroom</div><span class="workspace-label">Program reporting workspace</span></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">From uploaded records to a traceable report</p><h1>See the results. Trace every number.</h1><p class="muted intro-copy">Bring your program records together, review data quality, and create a report backed by its source rows.</p></div><ul class="product-facts"><li><strong>CSV, Excel and PDF</strong> in one reporting workflow</li><li><strong>Reviewable decisions</strong> for changes and duplicate matches</li><li><strong>Traceable metrics</strong> with source rows and a PDF report</li></ul></div>
+    <ol class="steps" aria-label="Report steps">
+      <li aria-current="step">1. Upload</li>
+      <li>2. Review Decisions &amp; Flags</li>
+      <li>3. Report</li>
+    </ol>
+    <section id="upload-step" class="panel" aria-labelledby="upload-heading">
+      <h2 id="upload-heading" tabindex="-1">Upload your records</h2>
+      <p class="section-description">Choose one or more files to start. You can review the processing decisions before opening your report.</p>
+      <form id="upload-form">
+        <div class="upload-zone"><label for="files">Choose CSV, Excel, or PDF files</label>
+        <input id="files" type="file" accept=".csv,.xlsx,.xls,.pdf" multiple required>
+        <p class="muted">PDFs need a text layer. Scanned documents will be skipped.</p></div>
+        <p id="file-list" aria-live="polite"></p>
+        <p class="notice">Files are processed in your browser. AI receives calculated totals, program labels, file names, column headings, worksheet titles, and your question. Individual records stay in your browser. Avoid personal details in file names and headings.</p>
+        <button id="process-button" type="submit">Process</button>
+        <p id="processing-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <section id="review-step" class="panel" aria-labelledby="review-heading" hidden>
+      <h2 id="review-heading" tabindex="-1">Data quality and decisions</h2>
+      <p class="section-description">See what changed, which records were merged, and which findings need review. Open a decision to compare the source values.</p>
+      <div id="quality-badges" aria-label="Data quality counts"></div>
+      <p id="review-summary"></p>
+      <div class="toolbar"><label for="audit-filter">Audit view</label><select id="audit-filter"><option value="all">All decisions</option><option value="cleaning">Field changes</option><option value="merge">Merges</option><option value="duplicate">Possible duplicates</option><option value="outlier">Outliers</option><option value="skipped">Skipped files</option></select><input id="audit-search" type="search" aria-label="Search audit trail" placeholder="Search name, record ID, or file"></div>
+      <p id="audit-count" class="muted" aria-live="polite"></p>
+      <div id="decision-list" class="decisions"></div>
+      <div class="actions">
+        <button id="back-upload" type="button" class="secondary">Back to upload</button>
+        <button id="view-report" type="button">Continue to report</button>
+      </div>
+    </section>
+    <section id="report-step" aria-labelledby="report-heading" hidden>
+      <div class="section-head"><h2 id="report-heading" tabindex="-1">Your program report</h2><button id="print-report" type="button">Download PDF report</button></div>
+      <p class="section-description">Select a metric to see the records behind it. The highlighted rows connect each result to its evidence.</p>
+      <p id="pdf-status" class="muted" role="status"></p>
+      <p id="report-date" class="muted"></p>
+      <div id="metric-cards" class="metric-grid"></div>
+      <div id="report-findings" class="panel"></div>
+      <section class="panel" style="margin-bottom:24px"><div class="section-head"><h3>Data summary</h3><button id="generate-summary" type="button" class="secondary">Generate AI summary</button></div><p id="summary-status" class="muted" role="status"></p><div id="data-summary" class="answer"></div></section>
+      <details id="report-audit"><summary>Full audit appendix</summary><div id="report-audit-entries"></div></details>
+      <section id="chat-panel" class="panel" aria-labelledby="chat-heading" style="margin-top:24px">
+        <h3 id="chat-heading">Ask about your report</h3>
+        <form id="chat-form">
+          <div class="chat-controls">
+            <div class="question">
+              <label for="question">Question</label>
+              <input id="question" type="text" maxlength="2000" required placeholder="What does this report show?">
+            </div>
+            <button id="ask-button" type="submit">Ask</button>
+          </div>
+        </form>
+        <p id="chat-status" role="status" aria-live="polite"></p>
+        <p id="answer" class="answer" aria-live="polite"></p>
+      </section>
+      <div class="actions">
+        <button id="back-review" type="button" class="secondary">Back to review</button>
+      </div>
+    </section>
+    <footer class="site-footer"><span>Recordroom</span><span>Source records are processed in your browser. AI uses summary context.</span></footer>
+  </main>
+  <script>
+    'use strict';
+    const fallback = 'Unique beneficiaries served this period, based on the uploaded records.';
+    const state = {
+      parsedRows: [], unsupportedFiles: [], sanitizedRows: [], sanitizeLog: [],
+      rows: [], mergeLog: [], possibleDuplicates: [], outliers: [], metrics: [], datasetSummary: null, audit: [], processedAt: null, narrative: '', narrativeSource: 'calculated', reportSummary: null
+    };
+    const steps = ['upload-step', 'review-step', 'report-step'];
+    const engine = window.DataEngine;
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    function element(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text !== undefined) node.textContent = String(text);
+      if (className) node.className = className;
+      return node;
+    }
+
+    function showStep(index) {
+      steps.forEach((id, position) => { document.getElementById(id).hidden = position !== index; });
+      document.querySelectorAll('.steps li').forEach((item, position) => {
+        if (position === index) item.setAttribute('aria-current', 'step');
+        else item.removeAttribute('aria-current');
+      });
+      document.querySelector('#' + steps[index] + ' h2').focus();
+    }
+
+    const normalized = value => value == null ? '' : String(value).trim().replace(/\s+/g, ' ').toLowerCase();
+    const blank = value => value == null || (typeof value === 'string' && !value.trim());
+    const shown = value => value == null ? 'Blank' : value instanceof Date ? value.toISOString() : String(value);
+    const typed = value => value == null ? 'Blank (null)' : value instanceof Date ? value.toISOString() + ' (date)' : typeof value === 'string' ? JSON.stringify(value) + ' (text)' : String(value) + ' (' + typeof value + ')';
+    function makeTable(headers, records) {
+      const wrap = element('div', undefined, 'table-wrap'), table = element('table'), head = element('thead'), heading = element('tr');
+      headers.forEach(label => { const cell = element('th', label); cell.scope = 'col'; heading.append(cell); }); head.append(heading); table.append(head);
+      const body = element('tbody'); records.forEach(values => { const row = element('tr'); values.forEach(value => row.append(element('td', shown(value)))); body.append(row); }); table.append(body); wrap.append(table); return wrap;
+    }
+    function recordTable(rows) { return makeTable(['ID','Name','Date','Program','Value','Source file'], rows.map(row => [row.id,row.name,row.date,row.program,row.value,row.source_file])); }
+    function recordLabel(row) { return row ? (row.name || 'Unnamed record') + ' · ' + row.id + ' · ' + row.source_file : 'Record unavailable'; }
+    function buildAudit() {
+      const original = new Map(state.parsedRows.map(row => [row.id,row]));
+      const working = new Map(state.sanitizedRows.map(row => [row.id,{...row}]));
+      const audit = state.sanitizeLog.map(entry => ({type:'cleaning',title:'The record '+entry.field + (entry.reason === 'missing field' ? ' is missing.' : entry.reason.startsWith('invalid') ? ' could not be interpreted.' : ' was standardized.'),context:recordLabel(original.get(entry.rowId)),reason:entry.reason,before:typed(entry.originalValue),after:typed(entry.cleanedValue)}));
+      state.mergeLog.forEach(entry => {
+        const kept = working.get(entry.keptRowId), before = {...kept};
+        const incoming = entry.mergedFromRowIds.map(id => ({...working.get(id)})), changes = [];
+        incoming.forEach(row => ['name','date','program','value'].forEach(field => {
+          if(blank(kept[field]) && !blank(row[field])) { changes.push([field,typed(kept[field]),typed(row[field]),'Filled from '+row.id]); kept[field]=row[field]; }
+          else if(!blank(row[field]) && !blank(kept[field]) && String(row[field]) !== String(kept[field])) changes.push([field,typed(kept[field]),typed(row[field]),'Kept first record value']);
+        }));
+        const matched = ['name'];
+        if(incoming.some(row => normalized(row.date) && normalized(row.date)===normalized(before.date))) matched.push('date');
+        if(entry.matchType==='fuzzy' && incoming.some(row => normalized(row.program) && normalized(row.program)===normalized(before.program))) matched.push('program');
+        audit.push({type:'merge',title:incoming.length+' incoming record(s) were merged into '+kept.id+'.',context:recordLabel(before),reason:entry.matchType+' match on '+matched.join(', ')+'; name similarity score '+(entry.confidence*100).toFixed(1)+'%.',before,incoming,after:{...kept},changes,filled:entry.fieldsReconciled});
+      });
+      state.possibleDuplicates.forEach(entry => { const records=entry.rowIds.map(id=>working.get(id)).filter(Boolean);audit.push({type:'duplicate',title:'These records may be duplicates. They were kept separate for review.',context:records.map(recordLabel).join(' / '),reason:entry.reason,records}); });
+      state.outliers.forEach(entry => { const row=state.rows.find(row=>row.id===entry.rowId);audit.push({type:'outlier',title:'Value '+entry.value+' excluded from recorded-value total',context:recordLabel(row),reason:entry.reason,records:row?[row]:[]}); });
+      state.unsupportedFiles.forEach(file=>audit.push({type:'skipped',title:'File skipped',context:file.source_file,reason:file.reason}));
+      return audit;
+    }
+    function auditNode(entry) {
+      const node=element('details',undefined,'audit-entry '+entry.type);node.append(element('summary',entry.title),element('p',entry.context,'muted'),element('p',entry.reason));
+      if(entry.type==='cleaning') node.append(makeTable(['Original value','Cleaned value'],[[entry.before,entry.after]]));
+      if(entry.type==='merge') { node.append(element('p','Fields filled from the incoming record: '+(entry.filled.join(', ')||'none')+'.'),recordTable([entry.before,...entry.incoming]),element('h3','Retained result'),recordTable([entry.after]));if(entry.changes.length)node.append(makeTable(['Field','Kept record before','Incoming value','Decision'],entry.changes));else node.append(element('p','All populated fields agree. The first record ID and source are retained.')); }
+      if(entry.records)node.append(recordTable(entry.records));return node;
+    }
+    function renderAudit() {
+      const type=document.getElementById('audit-filter').value,query=normalized(document.getElementById('audit-search').value);
+      const entries=state.audit.filter(entry=>(type==='all'||entry.type===type)&&(!query||normalized(JSON.stringify(entry)).includes(query)));
+      document.getElementById('audit-count').textContent=entries.length+' of '+state.audit.length+' decisions shown';
+      document.getElementById('decision-list').replaceChildren(...entries.map(auditNode));
+      if(!entries.length)document.getElementById('decision-list').append(element('p','No decisions match this view.','muted'));
+    }
+
+    function renderReview() {
+      const summary = state.datasetSummary;
+      const badges = document.getElementById('quality-badges');
+      badges.replaceChildren();
+      [
+        { label: 'Missing fields', value: summary.missingFieldCount, thresholds: { greenMax: 0, yellowMax: 5 } },
+        { label: 'Outliers', value: summary.outlierCount, thresholds: { greenMax: 0, yellowMax: 2 } }
+      ].forEach(item => {
+        const level = engine.getBadgeLevel(item.value, item.thresholds);
+        const badge = element('span', item.label === 'Missing fields' ? item.value+' required-field entries are missing. See the record details below.' : item.value+' unusual values are excluded from the recorded-value total.', 'badge ' + level);
+        badges.append(badge);
+      });
+      document.getElementById('review-summary').textContent = summary.totalRows + ' records remain after processing.';
+      renderAudit();
+    }
+
+    function renderReport() {
+      document.getElementById('report-date').textContent='Calculated '+state.processedAt.toLocaleString()+' from the uploaded files.';
+      const summary=state.datasetSummary,findings=document.getElementById('report-findings');
+      findings.replaceChildren(element('h3','Processing findings'),element('p',state.parsedRows.length+' records were imported. '+summary.mergeCount+' were merged, leaving '+summary.totalRows+' records.'),element('p',summary.possibleDuplicateCount+' possible duplicate pair(s) need review. '+summary.missingFieldCount+' required-field entries are missing. '+summary.outlierCount+' unusual values are excluded from the recorded-value total.'),element('p','Beneficiaries count named records remaining after merging. Similar-name merges are automated decisions, not confirmed identities.','notice'),element('p','Recorded value sums numeric values after excluding outliers. No currency or unit conversion is applied; only combine compatible values.','notice'),element('p','Exact matches use name and date. Fuzzy matches require a similar name plus the same date or program. Conflicting populated fields keep the first value. Outliers are outside the program mean ± two population standard deviations; groups below three numeric records are skipped.','muted'));
+      document.getElementById('report-audit-entries').replaceChildren(...state.audit.map(auditNode));
+      const cards = document.getElementById('metric-cards');
+      const rowLookup = new Map(state.rows.map(row => [row.id, row]));
+      cards.replaceChildren();
+      state.metrics.forEach(metric => {
+        const card = element('article', undefined, 'card');
+        card.append(element('h3', metric.label), element('p', metric.value, 'value'), element('p', metric.definition.replace(/\s+—\s+/g, ': '), 'muted'));
+        const details = element('details');
+        const traceSummary = element('summary', 'View source rows');
+        traceSummary.setAttribute('aria-label', 'View source rows for '+metric.label);
+        details.append(traceSummary);
+        const wrap = element('div', undefined, 'table-wrap');
+        const table = element('table');
+        table.append(element('caption', 'Source records for ' + metric.label));
+        const header = element('thead');
+        const headerRow = element('tr');
+        const fields = ['id', 'name', 'date', 'program', 'value'];
+        fields.forEach(field => {
+          const cell = element('th', field);
+          cell.scope = 'col';
+          headerRow.append(cell);
+        });
+        header.append(headerRow);
+        table.append(header);
+        const body = element('tbody');
+        metric.sourceRowIds.forEach(id => {
+          const row = rowLookup.get(id);
+          if (!row) return;
+          const tableRow = element('tr');
+          fields.forEach(field => { tableRow.append(element('td', row[field] == null ? '—' : row[field])); });
+          body.append(tableRow);
+        });
+        table.append(body);
+        wrap.append(table);
+        details.append(wrap);
+        card.append(details);
+        cards.append(card);
+      });
+    }
+
+    document.getElementById('upload-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const files = document.getElementById('files');
+      const button = document.getElementById('process-button');
+      const status = document.getElementById('processing-status');
+      if (!files.files.length || button.disabled) return;
+      button.disabled = true;
+      files.disabled = true;
+      status.textContent = 'Processing...';
+      try {
+        const libraries = [
+          ['Papa', 'CSV reader'], ['XLSX', 'Excel reader'],
+          ['pdfjsLib', 'PDF reader'], ['Fuse', 'duplicate matcher'], ['DataEngine', 'data engine']
+        ];
+        const unavailable = libraries.filter(([name]) => !window[name]);
+        if (unavailable.length) {
+          throw new Error('The ' + unavailable.map(([, label]) => label).join(', ') + ' could not load. Check your connection and reload the page.');
+        }
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        const parsed = await engine.parseFiles(files.files);
+        const unsupportedFiles = parsed.filter(row => row.unsupportedFile);
+        const parsedRows = parsed.filter(row => !row.unsupportedFile);
+        if (!parsedRows.length) throw new Error('No readable table records found. Check the headers; scanned PDFs require OCR.');
+        const sanitized = engine.sanitize(parsedRows);
+        const merged = engine.mergeDuplicates(sanitized.rows);
+        const outliers = engine.detectOutliers(merged.rows);
+        const metrics = engine.computeMetrics(merged.rows);
+        const datasetSummary = engine.buildDatasetSummary(
+          merged.rows, sanitized.log, merged.mergeLog, merged.possibleDuplicates, outliers, metrics
+        );
+        Object.assign(state, {
+          parsedRows, unsupportedFiles, sanitizedRows: sanitized.rows, sanitizeLog: sanitized.log,
+          rows: merged.rows, mergeLog: merged.mergeLog, possibleDuplicates: merged.possibleDuplicates,
+          outliers, metrics, datasetSummary, documentContext: parsed.documentContext || [], processedAt: new Date()
+        });
+        state.audit=buildAudit();document.getElementById('audit-filter').value='all';document.getElementById('audit-search').value='';
+        state.reportSummary=aggregateReport();state.narrative=calculatedSummary();state.narrativeSource='calculated';document.getElementById('data-summary').textContent=state.narrative;document.getElementById('summary-status').textContent='Calculated summary. Generate an AI explanation or download the summary report.';document.getElementById('pdf-status').textContent='';
+        document.getElementById('answer').textContent = '';
+        document.getElementById('chat-status').textContent = '';
+        renderReview();
+        renderReport();
+        status.textContent = '';
+        showStep(1);
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'We could not process these files. Check their format and try again.';
+      } finally {
+        button.disabled = false;
+        files.disabled = false;
+      }
+    });
+
+    document.getElementById('back-upload').addEventListener('click', () => showStep(0));
+    document.getElementById('view-report').addEventListener('click', () => showStep(2));
+    document.getElementById('back-review').addEventListener('click', () => showStep(1));
+    document.getElementById('files').addEventListener('change',event=>{document.getElementById('file-list').textContent=Array.from(event.target.files).map(file=>file.name+' ('+Math.ceil(file.size/1024)+' KB)').join(' · ');});
+    document.getElementById('audit-filter').addEventListener('change',renderAudit);
+    document.getElementById('audit-search').addEventListener('input',renderAudit);
+    function reportContent() {
+      const s=state.datasetSummary,r=state.reportSummary;
+      const lines=[['title','PROGRAM DATA SUMMARY'],['body','Calculated '+state.processedAt.toLocaleString()],['heading','Overview'],['body',state.narrative],['body',state.narrativeSource==='ai'?'Explanation generated with AI using aggregate results.':'Calculated explanation; AI was unavailable or not requested.'],['heading','Key metrics']];
+      state.metrics.forEach(metric=>lines.push(['metric',metric.label+': '+new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(metric.value)],['body',metric.definition]));
+      lines.push(['heading','Document coverage']);r.documents.forEach(document=>lines.push(['body',document.title+' ('+document.format.toUpperCase()+'): '+document.recordCount+' imported records. Columns: '+document.headers.join(', ')+'.']));
+      lines.push(['heading','Program breakdown']);r.programs.forEach(program=>lines.push(['body',program.program+': '+program.recordCount+' retained records; '+program.namedRecordCount+' named records; recorded value '+program.recordedValue+'; '+program.outlierCount+' excluded outliers.']));
+      lines.push(['heading','Data quality'],['body',r.importedRows+' records imported from '+r.fileCount+' files; '+s.mergeCount+' merged; '+s.totalRows+' retained.'],['body',s.possibleDuplicateCount+' possible duplicate pairs need review; '+s.missingFieldCount+' missing-field occurrences before merging; '+s.outlierCount+' values excluded as outliers.'],['heading','Interpretation'],['body','Beneficiaries are named records remaining after automated merging, not verified distinct people. Recorded values are summed without currency or unit conversion; combine compatible units only. Detailed record changes and merge decisions remain available in the on-screen audit trail.']);return lines;
+    }
+    function aggregateReport() {
+      const excluded=new Set(state.outliers.map(entry=>entry.rowId)),groups=new Map();
+      state.rows.forEach(row=>{const key=normalized(row.program)||'unspecified';if(!groups.has(key))groups.set(key,{program:row.program||'Unspecified program',recordCount:0,namedRecordCount:0,recordedValue:0,outlierCount:0});const group=groups.get(key);group.recordCount++;if(!blank(row.name))group.namedRecordCount++;if(excluded.has(row.id))group.outlierCount++;else if(typeof row.value==='number'&&Number.isFinite(row.value))group.recordedValue+=row.value;});
+      return {...state.datasetSummary,importedRows:state.parsedRows.length,fileCount:new Set(state.parsedRows.map(row=>row.source_file)).size,programs:Array.from(groups.values()),documents:state.documentContext || []};
+    }
+    function calculatedSummary() {
+      const s=state.datasetSummary,values=new Map(state.metrics.map(metric=>[metric.key,metric.value]));
+      const coverage=(state.documentContext||[]).map(document=>document.title+' contains columns for '+document.headers.join(', ')).join('; ');
+      return (coverage ? coverage+'. ' : '')+state.parsedRows.length+' records were imported, leaving '+s.totalRows+' records after '+s.mergeCount+' merges. The data contains '+values.get('uniqueBeneficiaries')+' named records after merging. Total recorded value is '+new Intl.NumberFormat().format(values.get('totalRecordedValue'))+', excluding '+s.outlierCount+' unusual values. '+s.possibleDuplicateCount+' possible duplicate pairs require review, and '+s.missingFieldCount+' missing-field occurrences were logged. Program totals are shown below. These records do not establish verified unique identities, and numeric totals assume compatible units.';
+    }
+    let summaryRequest=null;
+    async function requestSummary(payload,signal) {
+      if(location.protocol==='file:'){const error=new Error();error.code='local_file';throw error;}
+      for(let attempt=0;attempt<2;attempt++){
+        try{
+          const response=await fetch('/ask',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),signal,cache:'no-store',credentials:'same-origin'});
+          if(!response.ok){const error=new Error();error.code='http';error.status=response.status;throw error;}
+          if(!response.headers.get('content-type')?.includes('application/json')){const error=new Error();error.code='endpoint';throw error;}
+          return await response.json();
+        }catch(error){
+          if(signal.aborted||attempt===1||error.code==='endpoint'||(error.code==='http'&&error.status<500))throw error;
+          await new Promise(resolve=>setTimeout(resolve,600));
+        }
+      }
+    }
+    async function generateSummary() {
+      const snapshot=state.datasetSummary;if(summaryRequest)return summaryRequest;
+      const button=document.getElementById('generate-summary');button.disabled=true;document.getElementById('summary-status').textContent='Writing a summary of the data...';
+      let failureMessage='Could not reach the AI server. Check your connection and retry.',summarySucceeded=false;
+      summaryRequest=(async()=>{const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);try{
+        const data=await requestSummary({mode:'report',question:'Summarize the uploaded data and the calculated findings.',datasetSummary:state.reportSummary},controller.signal);
+        const reasons={missing_key:'Gemini is not configured on the server.',timeout:'Gemini took too long to respond. Retry the summary.',quota:'Gemini rate or quota limit reached. Wait a moment and retry.',authentication:'Gemini rejected the server credentials or permissions.',model:'The configured Gemini model is unavailable.',network:'The server could not connect to Gemini.',invalid_request:'The summary request was not valid.',invalid_response:'Gemini did not return a usable summary.',unavailable:'Gemini is temporarily unavailable.'};
+        if(data.generatedBy!=='ai'){failureMessage=reasons[data.reason]||'The server returned a calculated summary. Restart it if you recently updated the site.';throw new Error();}
+        if(typeof data.answer!=='string'||!data.answer.trim()){failureMessage='The server returned an empty summary.';throw new Error();}
+        if(snapshot!==state.datasetSummary)return;state.narrative=data.answer.slice(0,6000);state.narrativeSource='ai';summarySucceeded=true;
+      }catch(error){
+        if(controller.signal.aborted)failureMessage='The summary request timed out. Retry the summary.';
+        else if(error.code==='local_file')failureMessage='Open http://localhost:3000 instead of opening index.html directly. AI requires the running server.';
+        else if(error.code==='endpoint'||(error.code==='http'&&error.status===404))failureMessage='This website does not have a working /ask endpoint. Run or deploy the Node application, not only the HTML file.';
+        else if(error.code==='http')failureMessage='The server returned HTTP '+error.status+'. Retry in a moment.';
+        else if(error instanceof TypeError)failureMessage='Could not connect to the server at '+location.origin+'. Keep the Node server running and retry.';
+        if(snapshot===state.datasetSummary&&state.narrativeSource!=='ai'){state.narrative=calculatedSummary();state.narrativeSource='calculated';}
+      }
+      finally{clearTimeout(timeout);if(snapshot===state.datasetSummary){document.getElementById('data-summary').textContent=state.narrative;document.getElementById('summary-status').textContent=summarySucceeded?'AI explanation based on aggregate results.':failureMessage+(state.narrativeSource==='ai'?' Keeping the previous AI summary.':' Showing calculated results meanwhile.');}button.disabled=false;summaryRequest=null;}})();return summaryRequest;
+    }
+    document.getElementById('generate-summary').addEventListener('click',generateSummary);
+    function createReportPdf() {
+      const ascii=text=>String(text).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[—–]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').replace(/[^\x20-\x7e]/g,'?');
+      const escape=text=>text.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+      const pages=[];let commands=[],y=790;
+      const finish=()=>{commands.push('BT /F1 9 Tf 0.4 0.45 0.48 rg 46 28 Td (Program report | Page '+(pages.length+1)+') Tj ET');pages.push(commands.join('\n'));commands=[];y=790;};
+      reportContent().forEach(([kind,text])=>{
+        const size=kind==='title'?20:kind==='metric'?16:kind==='heading'?12:10,leading=size+6,limit=Math.floor(500/(size*.60));
+        const wrapped=[];let line='';ascii(text).split(/\s+/).forEach(word=>{while(word.length>limit){if(line){wrapped.push(line);line='';}wrapped.push(word.slice(0,limit));word=word.slice(limit);}if((line+' '+word).trim().length>limit){wrapped.push(line);line=word;}else line=(line+' '+word).trim();});if(line)wrapped.push(line);
+        if(kind==='heading'||kind==='metric'){if(y<160)finish();y-=10;}
+        wrapped.forEach(text=>{if(y-leading<52)finish();commands.push('BT /'+(kind==='body'?'F1':'F2')+' '+size+' Tf '+(kind==='body'?'0.12 0.17 0.20':'0.09 0.35 0.44')+' rg 46 '+y+' Td ('+escape(text)+') Tj ET');y-=leading;});y-=5;
+      });if(commands.length)finish();
+      const objects=[null,'<< /Type /Catalog /Pages 2 0 R >>','', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'],ids=[];
+      pages.forEach(stream=>{const id=objects.length;ids.push(id);objects.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+(id+1)+' 0 R >>','<< /Length '+stream.length+' >>\nstream\n'+stream+'\nendstream');});objects[2]='<< /Type /Pages /Kids ['+ids.map(id=>id+' 0 R').join(' ')+'] /Count '+ids.length+' >>';
+      let pdf='%PDF-1.4\n';const offsets=[0];for(let i=1;i<objects.length;i++){offsets.push(pdf.length);pdf+=i+' 0 obj\n'+objects[i]+'\nendobj\n';}const start=pdf.length;pdf+='xref\n0 '+objects.length+'\n0000000000 65535 f \n';offsets.slice(1).forEach(offset=>pdf+=String(offset).padStart(10,'0')+' 00000 n \n');pdf+='trailer\n<< /Size '+objects.length+' /Root 1 0 R >>\nstartxref\n'+start+'\n%%EOF';return new Blob([pdf],{type:'application/pdf'});
+    }
+    document.getElementById('print-report').addEventListener('click',async()=>{
+      const button=document.getElementById('print-report'),snapshot=state.datasetSummary;button.disabled=true;document.getElementById('pdf-status').textContent='Preparing the data summary...';
+      try{if(state.narrativeSource!=='ai')await generateSummary();if(snapshot!==state.datasetSummary)throw new Error();const url=URL.createObjectURL(createReportPdf()),link=element('a');link.href=url;link.download='program-summary-'+state.processedAt.toISOString().slice(0,10)+'.pdf';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);document.getElementById('pdf-status').textContent=state.narrativeSource==='ai'?'Summary report downloaded with an AI explanation and calculated metrics.':'Summary report downloaded using calculated results; AI was unavailable.';}
+      catch{document.getElementById('pdf-status').textContent='Could not generate the report. Please try again.';}
+      finally{button.disabled=false;}
+    });
+
+    document.getElementById('chat-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const question = document.getElementById('question').value.trim();
+      const button = document.getElementById('ask-button');
+      if (!question || !state.datasetSummary || button.disabled) return;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      button.disabled = true;
+      document.getElementById('chat-status').textContent = 'Getting an answer...';
+      document.getElementById('answer').textContent = '';
+      try {
+        const response = await fetch('/ask', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question, datasetSummary: state.reportSummary }), signal: controller.signal
+        });
+        if (!response.ok) throw new Error('Request failed');
+        const data = await response.json();
+        if (typeof data.answer !== 'string' || !data.answer.trim()) throw new Error('Missing answer');
+        document.getElementById('answer').textContent = data.answer;
+      } catch (error) {
+        document.getElementById('answer').textContent = fallback;
+      } finally {
+        clearTimeout(timeout);
+        button.disabled = false;
+        document.getElementById('chat-status').textContent = '';
+      }
+    });
+    if(location.protocol==='file:') {
+      const notice=element('p',undefined,'notice');notice.append(document.createTextNode('AI summaries need the running website. '));
+      const link=element('a','Open Recordroom at localhost:3000');link.href='http://localhost:3000';notice.append(link);
+      document.getElementById('upload-form').prepend(notice);
+    }
+  </script>
+</body>
+</html>
